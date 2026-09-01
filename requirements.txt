@@ -1,0 +1,34 @@
+# Core
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+xgboost>=2.0
+scipy>=1.11
+
+# NLP
+transformers>=4.35
+torch>=2.1
+tokenizers>=0.15
+datasets>=2.16
+spacy>=3.7
+nltk>=3.8
+
+# Feature Engineering
+textstat>=0.7.3
+
+# Visualization
+matplotlib>=3.8
+seaborn>=0.13
+wordcloud>=1.9
+
+# Evaluation
+shap>=0.43
+
+# App
+streamlit>=1.29
+
+# Utilities
+tqdm>=4.66
+python-dotenv>=1.0
+PyYAML>=6.0
+huggingface-hub>=0.20

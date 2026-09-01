@@ -1,0 +1,20 @@
+# Byte-compiled
+__pycache__/
+*.pyc
+
+# Virtual env
+.venv/
+
+# Data (too large for git)
+data/raw/
+data/processed/
+
+# Model outputs
+outputs/models/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

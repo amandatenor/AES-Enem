@@ -1,0 +1,50 @@
+project:
+  name: "AES-ENEM"
+  seed: 42
+  test_size: 0.2
+  val_size: 0.1
+
+competencias:
+  - "C1"  # Domínio da norma culta
+  - "C2"  # Compreensão do tema
+  - "C3"  # Seleção e organização de argumentos
+  - "C4"  # Coesão textual
+  - "C5"  # Proposta de intervenção
+
+# Escala de notas ENEM por competência: 0, 40, 80, 120, 160, 200
+nota_min: 0
+nota_max: 200
+nota_step: 40
+n_classes: 6  # 0,40,80,120,160,200
+
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  models: "outputs/models"
+  figures: "outputs/figures"
+  reports: "outputs/reports"
+
+baseline:
+  models:
+    - "svr"
+    - "random_forest"
+    - "xgboost"
+  svr:
+    kernel: "rbf"
+    C: 1.0
+  random_forest:
+    n_estimators: 200
+    max_depth: 20
+  xgboost:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.1
+
+bert:
+  model_name: "neuralmind/bert-base-portuguese-cased"
+  max_length: 512
+  batch_size: 8
+  epochs: 5
+  learning_rate: 2.0e-5
+  warmup_ratio: 0.1
+  weight_decay: 0.01
