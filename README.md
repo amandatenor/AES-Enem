@@ -5,7 +5,10 @@ Trabalho de Conclusão de Curso — Pós-graduação em Ciência dos Dados e Big
 ## Objetivo
 
 Desenvolver um sistema de Automatic Essay Scoring (AES) para redações do ENEM,
-predizendo notas nas 5 competências utilizando técnicas de NLP e Deep Learning.
+predizendo notas por competência utilizando técnicas de NLP e Deep Learning.
+
+> As competências treinadas são controladas em [configs/config.yaml](/Users/alope/Documents/xlvii-ejc-scripts/TCC.worktrees/bert-competencia5-subjetividade-testes/configs/config.yaml)
+> pela chave `competencias` (por exemplo, para experimentos sem C5).
 
 ## Estrutura do Projeto
 
@@ -58,6 +61,14 @@ python -m src.evaluation.evaluate
 # 5. Interface demo
 streamlit run src/app/app.py
 ```
+
+Após a avaliação, são gerados:
+- `outputs/reports/baseline_results.csv`
+- `outputs/reports/bert_results.csv`
+- `outputs/reports/model_comparison_results.csv`
+- `outputs/figures/model_comparison.png`
+- `outputs/figures/qwk_heatmap.png`
+- `outputs/figures/mae_vs_qwk.png`
 
 ## Dataset
 

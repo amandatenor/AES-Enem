@@ -1,9 +1,11 @@
 """
 Fine-tuning do BERTimbau para scoring de redações do ENEM.
 
-Treina um modelo de regressão (ou multi-output) sobre as 5 competências.
+Treina um modelo de regressão (ou multi-output) sobre as competências
+definidas em config.yaml.
 """
 
+import math
 from pathlib import Path
 
 import numpy as np
@@ -54,7 +56,7 @@ class EssayDataset(Dataset):
 
 
 class MultiOutputRegressor(torch.nn.Module):
-    """BERTimbau com cabeça de regressão multi-output (5 competências)."""
+    """BERTimbau com cabeça de regressão multi-output."""
 
     def __init__(self, model_name: str, num_outputs: int = 5):
         super().__init__()
@@ -100,10 +102,18 @@ def train_bert():
     data_path = ROOT / "data" / "processed" / "essays_processed.csv"
     df = pd.read_csv(data_path)
 
-    # Verificar colunas-alvo
-    target_cols = [c for c in ["C1_norm", "C2_norm", "C3_norm", "C4_norm", "C5_norm"]
-                   if c in df.columns]
+    # Verificar colunas-alvo conforme configuração de competências
+    configured_competencias = config.get("competencias", ["C1", "C2", "C3", "C4", "C5"])
+    configured_target_cols = [f"{comp}_norm" for comp in configured_competencias]
+    target_cols = [col for col in configured_target_cols if col in df.columns]
     num_outputs = len(target_cols) if target_cols else 1
+
+    missing_target_cols = [col for col in configured_target_cols if col not in df.columns]
+    if missing_target_cols:
+        print(
+            "[WARN] Algumas colunas configuradas não foram encontradas no dataset: "
+            f"{missing_target_cols}"
+        )
 
     if not target_cols:
         print("[WARN] Usando nota total normalizada.")
@@ -133,12 +143,18 @@ def train_bert():
 
     # Training
     output_dir = ROOT / "outputs" / "models" / "bertimbau"
+    steps_per_epoch = math.ceil(len(train_dataset) / bert_cfg["batch_size"])
+    total_training_steps = int(steps_per_epoch * bert_cfg["epochs"])
+    warmup_ratio = float(bert_cfg.get("warmup_ratio", 0.0))
+    warmup_steps = int(total_training_steps * warmup_ratio)
+    print(f"[INFO] warmup_steps={warmup_steps} (warmup_ratio={warmup_ratio:.4f})")
+
     training_args = TrainingArguments(
         output_dir=str(output_dir),
         num_train_epochs=bert_cfg["epochs"],
         per_device_train_batch_size=bert_cfg["batch_size"],
         per_device_eval_batch_size=bert_cfg["batch_size"],
-        warmup_ratio=bert_cfg["warmup_ratio"],
+        warmup_steps=warmup_steps,
         weight_decay=bert_cfg["weight_decay"],
         learning_rate=bert_cfg["learning_rate"],
         eval_strategy="epoch",

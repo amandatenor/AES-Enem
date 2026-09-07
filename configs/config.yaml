@@ -9,7 +9,9 @@ competencias:
   - "C2"  # Compreensão do tema
   - "C3"  # Seleção e organização de argumentos
   - "C4"  # Coesão textual
-  - "C5"  # Proposta de intervenção
+  # Experimento atual: remover C5 para medir impacto da subjetividade
+  # na qualidade das predições das demais competências.
+  # - "C5"  # Proposta de intervenção
 
 # Escala de notas ENEM por competência: 0, 40, 80, 120, 160, 200
 nota_min: 0

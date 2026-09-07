@@ -56,9 +56,17 @@ def train_baseline():
     # Identificar colunas de features (apenas numéricas, excluindo alvos)
     feature_cols = [c for c in df.select_dtypes(include=[np.number]).columns
                     if c not in NON_FEATURE_COLS]
-    # Identificar colunas-alvo disponíveis
-    target_cols = [c for c in ["C1_norm", "C2_norm", "C3_norm", "C4_norm", "C5_norm"]
-                   if c in df.columns]
+    # Identificar colunas-alvo disponíveis conforme configuração
+    configured_competencias = config.get("competencias", ["C1", "C2", "C3", "C4", "C5"])
+    configured_target_cols = [f"{comp}_norm" for comp in configured_competencias]
+    target_cols = [col for col in configured_target_cols if col in df.columns]
+
+    missing_target_cols = [col for col in configured_target_cols if col not in df.columns]
+    if missing_target_cols:
+        print(
+            "[WARN] Algumas colunas configuradas não foram encontradas no dataset: "
+            f"{missing_target_cols}"
+        )
 
     if not target_cols:
         print("[WARN] Colunas de notas não encontradas. Usando 'total' se disponível.")
