@@ -26,7 +26,15 @@ def load_essays(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
         )
 
     dfs = [pd.read_csv(f) for f in csv_files]
-    df = pd.concat(dfs, ignore_index=True).drop_duplicates(subset=["id"])
+    df = pd.concat(dfs, ignore_index=True)
+
+    # Remove apenas duplicatas exatas de linha para evitar colapsar
+    # redações válidas que compartilham o mesmo `id`.
+    n_before = len(df)
+    df = df.drop_duplicates().reset_index(drop=True)
+    removed = n_before - len(df)
+    if removed > 0:
+        print(f"[INFO] Removidas {removed} linhas duplicadas exatas.")
 
     # Renomear coluna de texto para padronizar
     if "essay_text" in df.columns:

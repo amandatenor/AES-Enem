@@ -4,6 +4,7 @@ Fine-tuning do BERTimbau para scoring de redações do ENEM.
 Treina um modelo de regressão (ou multi-output) sobre as 5 competências.
 """
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +27,54 @@ CONFIG_PATH = ROOT / "configs" / "config.yaml"
 def load_config():
     with open(CONFIG_PATH) as f:
         return yaml.safe_load(f)
+
+
+def get_target_cols(df: pd.DataFrame) -> list[str]:
+    target_cols = [c for c in ["C1_norm", "C2_norm", "C3_norm", "C4_norm", "C5_norm"] if c in df.columns]
+    if len(target_cols) != 5:
+        raise ValueError("É necessário ter as 5 competências normalizadas (C1_norm...C5_norm).")
+    return target_cols
+
+
+def get_train_val_split(df: pd.DataFrame, seed: int, test_size: float, min_val_samples: int = 8):
+    """
+    Gera split de treino/validação robusto para datasets pequenos.
+
+    - Usa todas as 5 competências;
+    - Remove linhas com NA em texto/alvos;
+    - Garante um tamanho mínimo de validação;
+    - Estratifica pela classe da média das competências quando possível.
+    """
+    target_cols = get_target_cols(df)
+
+    clean_df = df.dropna(subset=["essay_clean", *target_cols]).copy()
+    n_samples = len(clean_df)
+    if n_samples < 10:
+        raise ValueError(f"Poucas amostras válidas para treino BERT: {n_samples}.")
+
+    val_size = max(int(round(n_samples * test_size)), min_val_samples)
+    val_size = min(val_size, n_samples - 2)
+    val_size = max(2, val_size)
+
+    y_mean = clean_df[target_cols].mean(axis=1).values
+    bins = np.linspace(0, 1, 7)  # n_classes=6 -> 7 pontos de corte
+    stratify_labels = np.digitize(y_mean, bins[1:-1])
+    class_counts = pd.Series(stratify_labels).value_counts()
+    can_stratify = (class_counts >= 2).all() and len(class_counts) > 1
+
+    train_df, val_df = train_test_split(
+        clean_df,
+        test_size=val_size,
+        random_state=seed,
+        stratify=stratify_labels if can_stratify else None,
+    )
+
+    train_texts = train_df["essay_clean"].astype(str).tolist()
+    val_texts = val_df["essay_clean"].astype(str).tolist()
+    train_labels = train_df[target_cols].values.astype(np.float32)
+    val_labels = val_df[target_cols].values.astype(np.float32)
+
+    return train_texts, val_texts, train_labels, val_labels, target_cols
 
 
 class EssayDataset(Dataset):
@@ -100,26 +149,13 @@ def train_bert():
     data_path = ROOT / "data" / "processed" / "essays_processed.csv"
     df = pd.read_csv(data_path)
 
-    # Verificar colunas-alvo
-    target_cols = [c for c in ["C1_norm", "C2_norm", "C3_norm", "C4_norm", "C5_norm"]
-                   if c in df.columns]
-    num_outputs = len(target_cols) if target_cols else 1
-
-    if not target_cols:
-        print("[WARN] Usando nota total normalizada.")
-        if "total" in df.columns:
-            df["total_norm"] = df["total"] / 1000.0
-            target_cols = ["total_norm"]
-        else:
-            raise ValueError("Nenhuma coluna-alvo encontrada.")
-
-    texts = df["essay_clean"].astype(str).tolist()
-    labels = df[target_cols].values.astype(np.float32)
-
-    # Split
-    train_texts, val_texts, train_labels, val_labels = train_test_split(
-        texts, labels, test_size=config["project"]["test_size"], random_state=seed
+    train_texts, val_texts, train_labels, val_labels, target_cols = get_train_val_split(
+        df=df,
+        seed=seed,
+        test_size=config["project"]["test_size"],
     )
+    num_outputs = len(target_cols)
+    print(f"[INFO] Split treino/val: {len(train_texts)} / {len(val_texts)}")
 
     # Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(bert_cfg["model_name"])
@@ -133,12 +169,15 @@ def train_bert():
 
     # Training
     output_dir = ROOT / "outputs" / "models" / "bertimbau"
+    steps_per_epoch = int(np.ceil(len(train_dataset) / bert_cfg["batch_size"]))
+    total_steps = max(1, steps_per_epoch * int(bert_cfg["epochs"]))
+    warmup_steps = int(total_steps * bert_cfg["warmup_ratio"])
     training_args = TrainingArguments(
         output_dir=str(output_dir),
         num_train_epochs=bert_cfg["epochs"],
         per_device_train_batch_size=bert_cfg["batch_size"],
         per_device_eval_batch_size=bert_cfg["batch_size"],
-        warmup_ratio=bert_cfg["warmup_ratio"],
+        warmup_steps=warmup_steps,
         weight_decay=bert_cfg["weight_decay"],
         learning_rate=bert_cfg["learning_rate"],
         eval_strategy="epoch",
@@ -163,6 +202,16 @@ def train_bert():
     # Salvar
     trainer.save_model(str(output_dir / "best"))
     tokenizer.save_pretrained(str(output_dir / "best"))
+    metadata_path = output_dir / "best" / "metadata.json"
+    metadata = {
+        "target_cols": target_cols,
+        "train_size": len(train_texts),
+        "val_size": len(val_texts),
+        "seed": seed,
+        "test_size": config["project"]["test_size"],
+    }
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=True, indent=2)
     print(f"[INFO] Modelo salvo em {output_dir / 'best'}")
 
 

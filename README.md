@@ -54,6 +54,11 @@ python -m src.models.train_bert
 
 # 4. Avaliar resultados
 python -m src.evaluation.evaluate
+# Gera:
+# - outputs/reports/bert_results.csv
+# - outputs/reports/model_comparison_results.csv
+# - outputs/figures/baseline_vs_bert_comparison.png
+# - outputs/figures/best_baseline_vs_bert.png
 
 # 5. Interface demo
 streamlit run src/app/app.py

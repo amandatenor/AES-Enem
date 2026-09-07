@@ -86,8 +86,22 @@ def train_baseline():
             mask = ~np.isnan(y)
             X_valid, y_valid = X_scaled[mask], y[mask]
 
+            n_samples = len(y_valid)
+            val_size = max(int(round(n_samples * test_size)), 8)
+            val_size = min(val_size, n_samples - 2)
+            val_size = max(2, val_size)
+
+            bins = np.linspace(0, 1, config.get("n_classes", 6) + 1)
+            stratify_labels = np.digitize(y_valid, bins[1:-1])
+            class_counts = pd.Series(stratify_labels).value_counts()
+            can_stratify = (class_counts >= 2).all() and len(class_counts) > 1
+
             X_train, X_test, y_train, y_test = train_test_split(
-                X_valid, y_valid, test_size=test_size, random_state=seed
+                X_valid,
+                y_valid,
+                test_size=val_size,
+                random_state=seed,
+                stratify=stratify_labels if can_stratify else None,
             )
 
             model = get_model(model_name, config["baseline"])
