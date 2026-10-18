@@ -1,76 +1,106 @@
-# AES-ENEM: Correção Automática de Redações do ENEM
+# Sistema NLP de Apoio à Avaliação de Redações do ENEM
 
-Trabalho de Conclusão de Curso — Pós-graduação em Ciência dos Dados e Big Data.
+Projeto de TCC para apoio à avaliação de redações do ENEM com NLP e aprendizado supervisionado, usando o dataset AES-ENEM e modelagem híbrida (**BERTimbau + XGBoost**).
 
 ## Objetivo
 
-Desenvolver um sistema de Automatic Essay Scoring (AES) para redações do ENEM,
-predizendo notas nas 5 competências utilizando técnicas de NLP e Deep Learning.
+Construir um pipeline que receba **tema + redação** e retorne:
 
-## Estrutura do Projeto
+- estimativas para as competências **C1, C2, C3, C4 e C5**;
+- nota total estimada (0–1000);
+- modelo usado em cada competência;
+- evidências linguísticas e semânticas para apoio à interpretação humana.
 
-```
+> Este sistema é de apoio e **não substitui avaliação humana**.
+
+## Dataset
+
+Base principal: [AES ENEM Dataset](https://huggingface.co/datasets/kamel-usp/aes_enem_dataset) (configuração **JBCS2025** no notebook).
+
+Cada redação possui:
+
+- texto da redação;
+- tema/proposta;
+- notas por competência (C1–C5, escala 0–200);
+- nota total.
+
+## Pipeline do projeto (resumo)
+
+1. **Carga e validação dos dados** (splits oficiais train/validation/test).
+2. **Análise exploratória** (distribuições de notas, tamanho de redação, parágrafos, tokens BERT).
+3. **Preprocessing conservador** (normalização sem destruir estrutura textual).
+4. **Pipeline NLP base** (parágrafos, sentenças, tokens, lemas, POS, entidades).
+5. **Módulos de evidência por competência (C1–C5)**.
+6. **Consolidação de features numéricas**.
+7. **Baseline XGBoost** (um modelo por competência).
+8. **BERTimbau multi-output** (predição conjunta de C1–C5).
+9. **Comparação experimental** (MAE, RMSE, QWK e análises complementares).
+10. **Inferência híbrida final**:
+   - C1 → **BERTimbau**
+   - C2 → **XGBoost**
+   - C3 → **XGBoost**
+   - C4 → **XGBoost**
+   - C5 → **XGBoost**
+11. **Interface Gradio** para teste com nova redação.
+
+## Estrutura geral do repositório
+
+```text
 TCC/
-├── configs/             # Configurações e hiperparâmetros
+├── configs/
 ├── data/
-│   ├── raw/             # Dados brutos (Essay-BR, etc.)
-│   └── processed/       # Dados pré-processados
-├── notebooks/           # Análise exploratória e experimentos
+├── notebooks/
 ├── outputs/
-│   ├── models/          # Modelos treinados
-│   ├── figures/         # Gráficos e visualizações
-│   └── reports/         # Relatórios de avaliação
 ├── src/
-│   ├── data/            # Coleta e pré-processamento
-│   ├── features/        # Engenharia de features
-│   ├── models/          # Treinamento e inferência
-│   ├── evaluation/      # Métricas e análise de erros
-│   └── app/             # Interface Streamlit
 └── requirements.txt
 ```
+
+## Requisitos
+
+- Python 3.10+
+- Dependências em [requirements.txt](src/requirements.txt)
+- Modelo spaCy para português: `pt_core_news_sm`
 
 ## Instalação
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python -m spacy download pt_core_news_sm
 ```
 
-## Uso Rápido
+## Execução (via notebook disponível em /notebooks/Laboratorio-TCC.ipynb)
 
-```bash
-# 1. Baixar e preparar dados
-python -m src.data.download_essay_br
-python -m src.data.preprocessing
+O fluxo completo está documentado no notebook principal (12 blocos, do ambiente até a interface final).
 
-# 2. Extrair features e treinar baseline
-python -m src.features.extract_features
-python -m src.models.train_baseline
+### Principais saídas geradas no experimento
 
-# 3. Fine-tuning BERTimbau
-python -m src.models.train_bert
+- **Features**: `data/features_train.csv`, `data/features_validation.csv`, `data/features_test.csv`
+- **Modelos XGBoost**: `models/xgboost_C1.joblib` ... `models/xgboost_C5.joblib`
+- **Modelo BERTimbau**: `models/bertimbau_multioutput.pt`
+- **Relatórios**:
+  - `reports/xgboost_validation_metrics.csv`
+  - `reports/xgboost_test_metrics.csv`
+  - `reports/bertimbau_validation_metrics.csv`
+  - `reports/bertimbau_test_metrics.csv`
+  - `reports/comparacao_xgboost_bertimbau.csv`
 
-# 4. Avaliar resultados
-python -m src.evaluation.evaluate
-# Gera:
-# - outputs/reports/bert_results.csv
-# - outputs/reports/model_comparison_results.csv
-# - outputs/figures/baseline_vs_bert_comparison.png
-# - outputs/figures/best_baseline_vs_bert.png
+## Interface (Gradio)
 
-# 5. Interface demo
-streamlit run src/app/app.py
-```
+A interface recebe:
 
-## Dataset
+- tema da redação;
+- texto da redação.
 
-Utiliza o [AES ENEM Dataset](https://huggingface.co/datasets/kamel-usp/aes_enem_dataset)
-do HuggingFace (kamel-usp). Configs disponíveis:
+E exibe:
 
-- **JBCS2025**: 770 redações com texto de apoio e prompt (padrão)
-- **PROPOR2024**: 1155 redações
-- **gradesThousand**: 179 redações nota 1000
+- tabela com C1–C5 (modelo, predição contínua e nota estimada);
+- nota total estimada;
+- evidências linguísticas (com destaque para proposta de intervenção em C5).
 
-Cada redação possui notas nas 5 competências (0-200) + nota total.
+## Observações metodológicas
+
+- Splits oficiais são preservados (sem reamostragem aleatória para avaliação final).
+- Features de treino e inferência usam o mesmo pipeline de extração.
+- Evidências NLP são apresentadas como **apoio interpretativo**, não como explicação causal das notas previstas.
